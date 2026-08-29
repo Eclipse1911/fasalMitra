@@ -1,0 +1,6 @@
+{
+  "name": "FasalMitr",
+  "description": "FasalMitr - Smart Agricultural Market Intelligence & Direct Buyer Discovery Platform for Indian farmers to maximize net price realization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
