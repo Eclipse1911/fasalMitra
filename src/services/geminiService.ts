@@ -190,6 +190,7 @@ function getFallbackMarketSummary(params: {
 
 /**
  * Conversational crop advisor — answers farmer questions in natural language.
+ * Full multilingual support for Marathi (मराठी), Hindi (हिंदी), and English.
  */
 export async function askCropAdvisor(
   question: string,
@@ -203,40 +204,51 @@ export async function askCropAdvisor(
   }
 ): Promise<string> {
   const ai = getAI();
+
+  // Detect Devanagari script (Marathi / Hindi)
+  const containsDevanagari = /[\u0900-\u097F]/.test(question);
+  const isMarathi = context.language === 'mr' || (containsDevanagari && (question.includes('आहे') || question.includes('काय') || question.includes('कधी') || question.includes('विकावा') || question.includes('दर')));
+
   if (!ai) {
-    return 'AI advisor is not available. Please configure your Gemini API key in the .env file (VITE_GEMINI_API_KEY).';
+    return getSmartAdvisorFallback(question, context, isMarathi);
   }
 
-  const langInstruction = context.language === 'hi'
-    ? 'Respond in Hindi (Devanagari script).'
-    : context.language === 'mr'
-    ? 'Respond in Marathi (Devanagari script).'
-    : 'Respond in simple English.';
+  let langInstruction = 'Respond in simple, clear farmer-friendly English.';
+  if (isMarathi || context.language === 'mr') {
+    langInstruction = 'CRITICAL: Respond in authentic, simple Marathi (मराठी) using Devanagari script. Use common agricultural Marathi terms (e.g., सोयाबीन, कापूस, बाजारभाव, हमीभाव, निवडक खरेदीदार, निव्वळ नफा).';
+  } else if (context.language === 'hi' || (containsDevanagari && !isMarathi)) {
+    langInstruction = 'CRITICAL: Respond in clear, simple Hindi (हिंदी) using Devanagari script.';
+  }
 
-  const prompt = `You are FasalMitr AI, a friendly agricultural market advisor for farmers in Maharashtra, India.
+  const prompt = `You are FasalMitr AI (फसलमित्र), an expert agricultural market advisor and friend to farmers in Maharashtra, India.
+You understand English, Marathi (मराठी), and Hindi.
 
-Context about the farmer:
+Context about the farmer's produce:
 - Crop: ${context.crop}, Quantity: ${context.quantity} quintals
 - Location: ${context.district}, Maharashtra
-- Current mandi price: ₹${context.currentPrice}/quintal
-- Current recommendation: ${context.recommendation.recommendedActionTitle}
-- Expected net realization: ₹${context.recommendation.expectedNetRealizationPerQ}/quintal
+- Current local mandi modal price: ₹${context.currentPrice}/quintal
+- AI System Best Recommendation: ${context.recommendation.recommendedActionTitle} at ${context.recommendation.recommendedDestination}
+- Expected Net Realization (after transport & handling): ₹${context.recommendation.expectedNetRealizationPerQ}/quintal
+- Total Expected Payout: ₹${context.recommendation.expectedTotalRealization.toLocaleString()}
+- Risk Level: ${context.recommendation.riskLevel}
 
+Language Directive:
 ${langInstruction}
 
 The farmer asks: "${question}"
 
-Give a helpful, concise answer (3-5 sentences). Use specific numbers from the context when relevant. If the question is outside agricultural market topics, politely redirect. Do not use markdown formatting.`;
+Provide a warm, supportive, and numbers-accurate recommendation in 3-5 sentences.
+If responding in Marathi, make sure it is grammatically natural and encouraging for a farmer. Include relevant numbers like ₹${context.recommendation.expectedNetRealizationPerQ}/क्विंटल. Do not use markdown bullet points or bold markers.`;
 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
       contents: prompt,
     });
-    return response.text?.trim() || getSmartAdvisorFallback(question, context);
+    return response.text?.trim() || getSmartAdvisorFallback(question, context, isMarathi);
   } catch (e) {
     console.warn('Gemini API call failed (check VITE_GEMINI_API_KEY in .env):', e);
-    return getSmartAdvisorFallback(question, context);
+    return getSmartAdvisorFallback(question, context, isMarathi);
   }
 }
 
@@ -249,12 +261,31 @@ function getSmartAdvisorFallback(
     currentPrice: number;
     recommendation: AIRecommendation;
     language?: 'en' | 'hi' | 'mr';
-  }
+  },
+  forceMarathi: boolean = false
 ): string {
   const q = question.toLowerCase();
   const rec = context.recommendation;
+  const isMr = forceMarathi || context.language === 'mr' || /[\u0900-\u097F]/.test(question);
 
-  if (q.includes('sell') || q.includes('wait') || q.includes('hold') || q.includes(' कब ')) {
+  if (isMr) {
+    if (q.includes('sell') || q.includes('wait') || q.includes('hold') || q.includes('कधी') || q.includes('विकावा') || q.includes('थांबू')) {
+      return `${context.district} परिसरातील सध्याच्या बाजारभावानुसार, आमचा असा सल्ला आहे की तुम्ही तुमचे ${context.crop} ${rec.recommendedDestination} येथे विकावे. वाहतूक खर्च वजा करून तुम्हाला प्रति क्विंटल ₹${rec.expectedNetRealizationPerQ.toLocaleString()} निव्वळ उत्पन्न मिळेल (एकूण ₹${rec.expectedTotalRealization.toLocaleString()}).`;
+    }
+
+    if (q.includes('buyer') || q.includes('offer') || q.includes('price') || q.includes('दर') || q.includes('खरेदीदार')) {
+      return `तुमच्या ${context.quantity} क्विंटल ${context.crop} साठी सध्या सर्वोत्कृष्ट पर्याय ${rec.recommendedDestination} हा आहे, जो ₹${rec.recommendedPricePerQ.toLocaleString()}/क्विंटल दर देतो. स्थानिक बाजार समितीपेक्षा वाहतूक व हमाली वजा करून तुम्हाला ₹${rec.expectedNetRealizationPerQ.toLocaleString()}/क्विंटल निव्वळ नफा मिळतो.`;
+    }
+
+    if (q.includes('storage') || q.includes('warehouse') || q.includes('गोदाम') || q.includes('साठवणूक')) {
+      return `स्वीकृत गोदामात साठवणूक खर्च साधारण ₹४/क्विंटल/दिवस आहे. पुढील ७ दिवस धान्य साठवून ठेवणे ${rec.recommendedAction === 'HOLD_FOR_UPSIDE' ? 'फायदेशीर ठरू शकते कारण दरात तेजीची शक्यता आहे' : 'सध्याच्या थेट खरेदीदाराला विकण्यापेक्षा कमी फायदेशीर ठरेल'}.`;
+    }
+
+    return `तुमच्या ${context.district} मधील ${context.quantity} क्विंटल ${context.crop} साठी फसलमित्र AI चा सल्ला: ${rec.recommendedDestination} येथे विक्री करा. अपेक्षित निव्वळ मिळकत ₹${rec.expectedNetRealizationPerQ.toLocaleString()}/क्विंटल आहे.`;
+  }
+
+  // English fallbacks
+  if (q.includes('sell') || q.includes('wait') || q.includes('hold')) {
     return `Based on market conditions in ${context.district}, our recommendation is to ${rec.recommendedActionTitle} at ${rec.recommendedDestination}. Your expected net realization is ₹${rec.expectedNetRealizationPerQ.toLocaleString()}/quintal (total ₹${rec.expectedTotalRealization.toLocaleString()}). ${rec.reasons[0] || ''}`;
   }
 
@@ -262,7 +293,7 @@ function getSmartAdvisorFallback(
     return `The current top destination for your ${context.quantity} quintals of ${context.crop} is ${rec.recommendedDestination} offering ₹${rec.recommendedPricePerQ.toLocaleString()}/quintal. After logistics and handling, your net profit is ₹${rec.expectedNetRealizationPerQ.toLocaleString()}/q vs local mandi modal price of ₹${context.currentPrice.toLocaleString()}/q.`;
   }
 
-  if (q.includes('storage') || q.includes('warehouse') || q.includes('hold')) {
+  if (q.includes('storage') || q.includes('warehouse')) {
     return `Storage in an accredited Godown costs approx ₹4/quintal/day. Holding for 7 days is ${rec.recommendedAction === 'HOLD_FOR_UPSIDE' ? 'recommended due to bullish price momentum' : 'less profitable than immediate direct buyer fulfillment'} for your ${context.crop} lot.`;
   }
 
