@@ -437,7 +437,7 @@ export default function App() {
       <footer className="bg-white border-t border-slate-200 py-4 px-4 sm:px-8 mt-auto text-xs text-slate-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center space-x-2">
-            <span className="font-bold text-slate-900">KrishiLink AI</span>
+            <span className="font-bold text-slate-900">FasalMitr AI</span>
             <span>•</span>
             <span>SIH 2026 Problem Statement #26132</span>
             <span>•</span>

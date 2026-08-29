@@ -132,7 +132,7 @@ export const MAHARASHTRA_MARKETS: MarketLocation[] = [
 export const DEMO_FARMER_RAMESH: FarmerProfile = {
   id: 'user_ramesh_patil',
   name: 'Ramesh Patil',
-  email: 'ramesh.patil@krishilink.demo',
+  email: 'ramesh.patil@fasalmitr.demo',
   phone: '+91 98234 56789',
   role: 'farmer',
   district: 'Akola',

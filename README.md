@@ -1,4 +1,4 @@
-# 🌾 FasalMitr (KrishiLink AI)
+# 🌾 FasalMitr AI
 ### Smart Farmer Market Linkage & Price Discovery Platform
 
 > **SIH Problem Statement ID:** SIH26132  

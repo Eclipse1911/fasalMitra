@@ -3,7 +3,7 @@ import type { AIRecommendation, BuyerMatchItem, MarketPriceRecord, CropType } fr
 
 // Client-side Gemini integration for hackathon demo.
 // In production, API calls should be proxied through a backend server.
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+const apiKey = (import.meta.env.VITE_GEMINI_API_KEY || (import.meta.env as any).GEMINI_API_KEY || '').replace(/^["']|["']$/g, '');
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -233,9 +233,38 @@ Give a helpful, concise answer (3-5 sentences). Use specific numbers from the co
       model: 'gemini-2.0-flash',
       contents: prompt,
     });
-    return response.text?.trim() || 'I could not generate a response. Please try again.';
+    return response.text?.trim() || getSmartAdvisorFallback(question, context);
   } catch (e) {
-    console.warn('Gemini crop advisor failed:', e);
-    return 'AI advisor encountered an error. Please try again in a moment.';
+    console.warn('Gemini API call failed (check VITE_GEMINI_API_KEY in .env):', e);
+    return getSmartAdvisorFallback(question, context);
   }
+}
+
+function getSmartAdvisorFallback(
+  question: string,
+  context: {
+    crop: CropType;
+    quantity: number;
+    district: string;
+    currentPrice: number;
+    recommendation: AIRecommendation;
+    language?: 'en' | 'hi' | 'mr';
+  }
+): string {
+  const q = question.toLowerCase();
+  const rec = context.recommendation;
+
+  if (q.includes('sell') || q.includes('wait') || q.includes('hold') || q.includes(' कब ')) {
+    return `Based on market conditions in ${context.district}, our recommendation is to ${rec.recommendedActionTitle} at ${rec.recommendedDestination}. Your expected net realization is ₹${rec.expectedNetRealizationPerQ.toLocaleString()}/quintal (total ₹${rec.expectedTotalRealization.toLocaleString()}). ${rec.reasons[0] || ''}`;
+  }
+
+  if (q.includes('buyer') || q.includes('offer') || q.includes('price')) {
+    return `The current top destination for your ${context.quantity} quintals of ${context.crop} is ${rec.recommendedDestination} offering ₹${rec.recommendedPricePerQ.toLocaleString()}/quintal. After logistics and handling, your net profit is ₹${rec.expectedNetRealizationPerQ.toLocaleString()}/q vs local mandi modal price of ₹${context.currentPrice.toLocaleString()}/q.`;
+  }
+
+  if (q.includes('storage') || q.includes('warehouse') || q.includes('hold')) {
+    return `Storage in an accredited Godown costs approx ₹4/quintal/day. Holding for 7 days is ${rec.recommendedAction === 'HOLD_FOR_UPSIDE' ? 'recommended due to bullish price momentum' : 'less profitable than immediate direct buyer fulfillment'} for your ${context.crop} lot.`;
+  }
+
+  return `For your ${context.quantity} quintals of ${context.crop} in ${context.district}, FasalMitr analysis recommends: ${rec.recommendedActionTitle} at ${rec.recommendedDestination}. Expected net realization is ₹${rec.expectedNetRealizationPerQ.toLocaleString()}/quintal. Risk level is ${rec.riskLevel}.`;
 }
