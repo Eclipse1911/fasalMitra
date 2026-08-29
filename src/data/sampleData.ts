@@ -660,7 +660,7 @@ export function generateSyntheticMarketPrices(selectedFarmerDistrict: string = '
     },
   };
 
-  const today = '2026-08-29';
+  const today = new Date().toISOString().split('T')[0];
 
   MAHARASHTRA_CROPS.forEach((crop) => {
     const base = basePrices[crop.name] || 5000;

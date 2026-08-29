@@ -1,12 +1,31 @@
 import { LogisticsEstimate } from '../types';
+import { MAHARASHTRA_MARKETS } from '../data/sampleData';
+
+/**
+ * Haversine formula to calculate distance between two lat/lng points in kilometers.
+ */
+function haversineDistanceKm(
+  lat1: number, lon1: number,
+  lat2: number, lon2: number
+): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 export class LogisticsService {
   /**
    * Calculate realistic transportation cost across Maharashtra road logistics.
    * Model:
-   * - Base vehicle mobilization charge (pickup & loading): ₹1,200
-   * - Distance rate: ₹22/km
-   * - Weight rate: ₹1.8 / quintal / km for distances > 10 km
+   * - Base vehicle mobilization charge (pickup & loading): ₹1,200 / ₹2,400 / ₹4,500
+   * - Distance rate: ₹22/km (light) / ₹32/km (medium) / ₹48/km (heavy)
+   * - Weight rate: ₹0.45 / quintal / km
    * - Minimum per trip cost: ₹1,500
    */
   public static calculateEstimate(
@@ -18,19 +37,19 @@ export class LogisticsService {
     const safeDistance = Math.max(5, Math.round(distanceKm));
     const safeQty = Math.max(1, quantityQuintals);
 
-    // Vehicle selection based on load
+    // Vehicle selection based on load — IMPORTANT: check largest first
     let vehicleType = 'Mini Pickup Truck (Tata Ace / Bolero Maxi)';
     let baseRate = 1200;
     let kmRate = 22;
 
-    if (safeQty > 40) {
-      vehicleType = 'Medium Commercial Vehicle (Eicher 6-Wheeler)';
-      baseRate = 2400;
-      kmRate = 32;
-    } else if (safeQty > 100) {
+    if (safeQty > 100) {
       vehicleType = 'Heavy Transport Truck (10-Wheeler Multi-Axle)';
       baseRate = 4500;
       kmRate = 48;
+    } else if (safeQty > 40) {
+      vehicleType = 'Medium Commercial Vehicle (Eicher 6-Wheeler)';
+      baseRate = 2400;
+      kmRate = 32;
     }
 
     // Cost formula: base + distance + quantity handling
@@ -53,36 +72,42 @@ export class LogisticsService {
   }
 
   /**
-   * Helper to estimate distance between two Maharashtra locations
+   * Estimate road distance between a farmer's district and a destination using
+   * Haversine formula on real APMC market lat/lng coordinates.
+   * Applies a 1.3x road multiplier for Maharashtra terrain (winding state highways).
    */
   public static estimateDistanceKm(fromDistrict: string, toLocationName: string): number {
-    const lowerFrom = fromDistrict.toLowerCase();
-    const lowerTo = toLocationName.toLowerCase();
+    const ROAD_MULTIPLIER = 1.3;
 
-    if (lowerFrom.includes('akola')) {
-      if (lowerTo.includes('akola')) return 15;
-      if (lowerTo.includes('washim')) return 65;
-      if (lowerTo.includes('amravati')) return 90;
-      if (lowerTo.includes('buldhana') || lowerTo.includes('khamgaon')) return 75;
-      if (lowerTo.includes('nagpur')) return 245;
-      if (lowerTo.includes('latur')) return 260;
-      if (lowerTo.includes('nashik') || lowerTo.includes('lasalgaon')) return 340;
-      if (lowerTo.includes('aurangabad') || lowerTo.includes('sambhajinagar')) return 230;
-      if (lowerTo.includes('pune')) return 480;
-      if (lowerTo.includes('jalgaon')) return 160;
-      if (lowerTo.includes('yavatmal')) return 140;
-      if (lowerTo.includes('solapur')) return 360;
-      return 110;
+    // Find origin market (farmer's district)
+    const fromMarket = MAHARASHTRA_MARKETS.find(
+      m => m.district.toLowerCase() === fromDistrict.toLowerCase()
+    );
+
+    // Find destination market by name or district
+    const toMarket = MAHARASHTRA_MARKETS.find(
+      m => toLocationName.toLowerCase().includes(m.name.toLowerCase()) ||
+           toLocationName.toLowerCase().includes(m.district.toLowerCase()) ||
+           m.name.toLowerCase().includes(toLocationName.toLowerCase())
+    );
+
+    if (fromMarket && toMarket) {
+      if (fromMarket.id === toMarket.id) {
+        return 15; // Same market, local transport only
+      }
+      const straightLine = haversineDistanceKm(
+        fromMarket.latitude, fromMarket.longitude,
+        toMarket.latitude, toMarket.longitude
+      );
+      return Math.round(straightLine * ROAD_MULTIPLIER);
     }
 
-    if (lowerFrom.includes('nashik')) {
-      if (lowerTo.includes('nashik') || lowerTo.includes('lasalgaon')) return 20;
-      if (lowerTo.includes('pune')) return 210;
-      if (lowerTo.includes('mumbai')) return 170;
-      if (lowerTo.includes('aurangabad') || lowerTo.includes('sambhajinagar')) return 190;
-      return 280;
+    // Fallback: if one side is found, estimate from average
+    if (fromMarket || toMarket) {
+      return 95;
     }
 
-    return 95;
+    return 95; // Default fallback
   }
 }
+

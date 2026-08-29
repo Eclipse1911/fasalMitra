@@ -1,92 +1,33 @@
 import { FPOAggregationCluster, BuyerRequirement, FarmerLot } from '../types';
-import { DEMO_BUYER_ABC, DEMO_FPO_AKOLA } from '../data/sampleData';
+import { DEMO_FPO_AKOLA, INITIAL_FARMER_LOTS, SAMPLE_BUYER_REQUIREMENTS } from '../data/sampleData';
 
 export class FPOService {
   private static clusters: FPOAggregationCluster[] = [];
 
-  public static generateDefaultCluster(): FPOAggregationCluster {
-    const targetRequirement: BuyerRequirement = {
-      id: 'req_soybean_abc',
-      buyerId: 'buyer_abc_agro',
-      buyerName: 'Anand Kulkarni',
-      businessName: 'ABC Agro Foods Pvt Ltd',
-      location: 'MIDC Phase 1, Akola',
-      district: 'Akola',
-      crop: 'Soybean',
-      requiredQuantity: 100, // 100 quintals required
-      fulfilledQuantity: 0,
-      qualityRequired: 'Grade A',
-      offeredPrice: 5200, // ₹5,200/q
-      requiredDate: '2026-09-08',
-      verificationStatus: 'Verified',
-      reliabilityScore: 94,
-      distanceKm: 35,
-      status: 'Open',
-      createdAt: '2026-08-28T09:30:00Z',
-    };
+  /**
+   * Dynamically generate an aggregation cluster by matching available farmer lots
+   * against the first open buyer requirement for the given crop.
+   * Falls back to Soybean / ABC Agro Foods if no crop specified.
+   */
+  public static generateDefaultCluster(crop: string = 'Soybean'): FPOAggregationCluster {
+    // Find a matching buyer requirement
+    const targetRequirement = SAMPLE_BUYER_REQUIREMENTS.find(
+      r => r.crop === crop && r.status === 'Open'
+    ) || SAMPLE_BUYER_REQUIREMENTS[0];
 
-    const contributingFarmers = [
-      {
-        farmerId: 'user_ramesh_patil',
-        farmerName: 'Ramesh Patil',
-        lotId: 'lot_ramesh_soybean_01',
-        quantity: 20,
-        quality: 'Grade A' as const,
-        payoutRatePerQ: 5120, // Net payout after ₹80 FPO service fee
-        estimatedPayout: 20 * 5120,
-      },
-      {
-        farmerId: 'farmer_ganesh_wankhede',
-        farmerName: 'Ganesh Wankhede',
-        lotId: 'lot_ganesh_soybean',
-        quantity: 15,
-        quality: 'Grade A' as const,
-        payoutRatePerQ: 5120,
-        estimatedPayout: 15 * 5120,
-      },
-      {
-        farmerId: 'farmer_vitthal_ghatole',
-        farmerName: 'Vitthal Ghatole',
-        lotId: 'lot_vitthal_soybean',
-        quantity: 30,
-        quality: 'Grade A' as const,
-        payoutRatePerQ: 5120,
-        estimatedPayout: 30 * 5120,
-      },
-      {
-        farmerId: 'farmer_sunil_baviskar',
-        farmerName: 'Sunil Baviskar',
-        lotId: 'lot_sunil_soybean',
-        quantity: 25,
-        quality: 'Grade A' as const,
-        payoutRatePerQ: 5120,
-        estimatedPayout: 25 * 5120,
-      },
-      {
-        farmerId: 'farmer_dnyaneshwar_kute',
-        farmerName: 'Dnyaneshwar Kute',
-        lotId: 'lot_dnyaneshwar_soybean',
-        quantity: 10,
-        quality: 'Grade A' as const,
-        payoutRatePerQ: 5120,
-        estimatedPayout: 10 * 5120,
-      },
-    ];
+    // Find all available farmer lots matching the crop and quality
+    const matchingLots = INITIAL_FARMER_LOTS.filter(
+      lot => lot.crop === targetRequirement.crop &&
+             lot.status === 'Available' &&
+             lot.quality === targetRequirement.qualityRequired
+    );
 
-    const allocatedQuantity = contributingFarmers.reduce((sum, f) => sum + f.quantity, 0);
-
-    return {
-      id: 'cluster_fpo_akola_soybean_100q',
-      fpoId: DEMO_FPO_AKOLA.id,
-      fpoName: DEMO_FPO_AKOLA.fpoName,
-      targetBuyerRequirement: targetRequirement,
-      targetQuantity: 100,
-      allocatedQuantity,
-      contributingFarmers,
-      isComplete: allocatedQuantity >= 100,
-      potentialFpoMarginPerQ: 80, // FPO retains ₹80/q for grading, assaying & logistics orchestration
-      totalGrossValue: allocatedQuantity * 5200,
-    };
+    return this.createCluster(
+      DEMO_FPO_AKOLA.id,
+      DEMO_FPO_AKOLA.fpoName,
+      targetRequirement,
+      matchingLots
+    );
   }
 
   public static createCluster(
@@ -123,8 +64,9 @@ export class FPOService {
       allocatedQuantity: allocated,
       contributingFarmers: contributors,
       isComplete: allocated >= requirement.requiredQuantity,
-      potentialFpoMarginPerQ: 80,
+      potentialFpoMarginPerQ: 80, // FPO retains ₹80/q for grading, assaying & logistics orchestration
       totalGrossValue: allocated * requirement.offeredPrice,
     };
   }
 }
+

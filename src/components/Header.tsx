@@ -104,8 +104,8 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Logo & Product Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-800 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20">
-              <Sprout className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-2xl overflow-hidden bg-emerald-700 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20">
+              <img src="/logo.jpg" alt="FasalMitr Logo" className="w-full h-full object-cover" />
             </div>
             <div>
               <div className="flex items-center space-x-2">

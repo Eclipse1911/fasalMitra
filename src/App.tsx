@@ -24,6 +24,7 @@ import { AdminDashboard } from './components/AdminDashboard';
 import { MyProduceView } from './components/MyProduceView';
 import { AboutProjectModal } from './components/AboutProjectModal';
 import { DemoTourModal } from './components/DemoTourModal';
+import { AIChatAdvisor } from './components/AIChatAdvisor';
 
 import {
   DEMO_FARMER_RAMESH,
@@ -420,6 +421,16 @@ export default function App() {
         isOpen={isDemoTourOpen}
         onClose={() => setIsDemoTourOpen(false)}
         onJumpToStep={handleExecuteDemoStep}
+      />
+
+      {/* AI Chat Advisor — Floating over all views */}
+      <AIChatAdvisor
+        crop={activeLot.crop}
+        quantity={activeLot.quantityQuintals}
+        district={activeLot.district}
+        currentPrice={marketPrices.find(m => m.district === activeLot.district && m.crop === activeLot.crop)?.modalPrice || 5000}
+        recommendation={recommendation}
+        language={currentLanguage}
       />
 
       {/* Persistent Footer */}
